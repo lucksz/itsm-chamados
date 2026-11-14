@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   CircularProgress,
@@ -16,7 +16,7 @@ import AddCommentOutlinedIcon from '@mui/icons-material/AddCommentOutlined'
 import SearchOutlinedIcon from '@mui/icons-material/SearchOutlined'
 import { useTickets } from '../../hooks/useTickets'
 import { TicketDetailPanel } from '../tickets/TicketDetailPanel'
-import { PRIORITY_LABELS, STATUS_LABELS, getSlaState, formatDateTime } from '../../domain/tickets'
+import { PRIORITY_LABELS, STATUS_LABELS, getSlaState, formatDateTime, isFinishedTicket } from '../../domain/tickets'
 import { PriorityChip, StatusChip, SlaChip } from '../../components/TicketBadges'
 import { eventBus } from '../../mocks/eventBus'
 import { useDemoClock } from '../../hooks/useDemoClock'
@@ -32,6 +32,7 @@ export function ConsultantWorkspace({ user }) {
   const [sort, setSort] = useState('sla')
   const [selectedId, setSelectedId] = useState('')
   const [unreadByTicket, setUnreadByTicket] = useState({})
+  const detailRef = useRef(null)
   const demoNow = useDemoClock()
   const query = useTickets(user.id, {
     page: 1,
@@ -63,7 +64,8 @@ export function ConsultantWorkspace({ user }) {
       }))
     }
   }), [activeTicketId, user.id])
-  const urgentCount = tickets.filter((ticket) => ['at_risk', 'breached'].includes(getSlaState(ticket, demoNow).state)).length
+  const urgentCount = tickets.filter((ticket) => !isFinishedTicket(ticket)
+    && ['at_risk', 'breached'].includes(getSlaState(ticket, demoNow).state)).length
   const mineCount = scope === 'mine' ? query.data?.total : undefined
 
   return (
@@ -72,15 +74,15 @@ export function ConsultantWorkspace({ user }) {
         <div>
           <Typography variant="overline" color="primary">Operação · Infraestrutura</Typography>
           <Typography variant="h4" sx={{ fontWeight: 800 }} className="tracking-tight">Central de atendimento</Typography>
-          <Typography color="text.secondary" className="mt-1">Escolha o próximo chamado pela urgência do SLA e continue o atendimento sem perder o contexto.</Typography>
+          <Typography color="textSecondary" className="mt-1">Escolha o próximo chamado pela urgência do SLA e continue o atendimento sem perder o contexto.</Typography>
         </div>
         <div className="flex flex-wrap gap-2">
           <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-2">
             <Typography variant="caption" color="error">Precisam de atenção</Typography>
-            <Typography variant="h6" sx={{ fontWeight: 750 }} color="error.main">{urgentCount}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 750 }} color="error">{urgentCount}</Typography>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-2">
-            <Typography variant="caption" color="text.secondary">{scope === 'mine' ? 'Meus chamados' : 'Fila sem responsável'}</Typography>
+            <Typography variant="caption" color="textSecondary">{scope === 'mine' ? 'Meus chamados' : 'Fila sem responsável'}</Typography>
             <Typography variant="h6" sx={{ fontWeight: 750 }}>{mineCount ?? query.data?.total ?? '—'}</Typography>
           </div>
         </div>
@@ -141,11 +143,11 @@ export function ConsultantWorkspace({ user }) {
             </div>
             {query.isLoading && <div className="grid h-48 place-items-center"><CircularProgress size={26} /></div>}
             {query.isError && <Alert severity="error" className="m-4">{query.error.message}</Alert>}
-            {!query.isLoading && tickets.length === 0 && (
+            {!query.isLoading && !query.isError && tickets.length === 0 && (
               <div className="px-5 py-12 text-center">
                 <AddCommentOutlinedIcon className="text-slate-300" fontSize="large" />
                 <Typography variant="subtitle2" className="mt-2">Nenhum chamado nesta fila</Typography>
-                <Typography variant="caption" color="text.secondary">Ajuste os filtros ou verifique novamente mais tarde.</Typography>
+                <Typography variant="caption" color="textSecondary">Ajuste os filtros ou verifique novamente mais tarde.</Typography>
               </div>
             )}
             <div className="max-h-[570px] overflow-y-auto">
@@ -163,12 +165,16 @@ export function ConsultantWorkspace({ user }) {
                         delete next[ticket.id]
                         return next
                       })
+                      // Em telas estreitas o detalhe fica abaixo da lista.
+                      if (!window.matchMedia('(min-width: 1280px)').matches) {
+                        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }
                     }}
                     className={`block w-full border-t border-slate-100 px-4 py-4 text-left transition hover:bg-indigo-50/60 ${selected ? 'border-l-4 border-l-indigo-600 bg-indigo-50/50' : 'border-l-4 border-l-transparent'}`}
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <Typography variant="caption" color="text.secondary">#{ticket.numero}</Typography>
+                        <Typography variant="caption" color="textSecondary">#{ticket.numero}</Typography>
                         {unreadByTicket[ticket.id] > 0 && <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white" aria-label={`${unreadByTicket[ticket.id]} mensagens novas`}>{unreadByTicket[ticket.id]} nova(s)</span>}
                       </div>
                       <SlaChip state={sla.state} />
@@ -178,10 +184,10 @@ export function ConsultantWorkspace({ user }) {
                       <StatusChip status={ticket.status} />
                       <PriorityChip priority={ticket.prioridade} />
                     </div>
-                    <Typography variant="caption" color="text.secondary" display="block" className="mt-2">
+                    <Typography variant="caption" color="textSecondary" className="mt-2 block">
                       {ticket.solicitante?.nome || 'Solicitante'} · {ticket.grupo?.nome}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="textSecondary" className="block">
                       Atualizado {formatDateTime(ticket.atualizado_em, user)}
                     </Typography>
                   </button>
@@ -189,10 +195,10 @@ export function ConsultantWorkspace({ user }) {
               })}
             </div>
           </aside>
-          <section className="min-w-0 p-4 sm:p-5">
+          <section ref={detailRef} className="min-w-0 scroll-mt-20 p-4 sm:p-5">
             {activeTicketId
               ? <TicketDetailPanel user={user} ticketId={activeTicketId} />
-              : <div className="grid min-h-[600px] place-items-center text-center"><div><Typography variant="h6">Selecione um chamado</Typography><Typography color="text.secondary">A conversa e os próximos passos aparecerão aqui.</Typography></div></div>}
+              : <div className="grid min-h-[600px] place-items-center text-center"><div><Typography variant="h6">Selecione um chamado</Typography><Typography color="textSecondary">A conversa e os próximos passos aparecerão aqui.</Typography></div></div>}
           </section>
         </div>
       </Paper>

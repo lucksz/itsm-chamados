@@ -59,6 +59,19 @@ export function getTicketUrgency(ticket, now) {
   return Math.min(rank[response.state], rank[resolution.state])
 }
 
+export function isFinishedTicket(ticket) {
+  return CLOSED_STATUSES.has(ticket.status)
+}
+
+export function getCustomerNextStep(ticket) {
+  if (ticket.status === 'aguardando_cliente') return 'A equipa precisa da sua resposta.'
+  if (ticket.status === 'fechado') return 'Pedido encerrado. Reabra-o se o problema continuar.'
+  if (ticket.status === 'resolvido') return 'A equipa marcou o pedido como resolvido. Responda na conversa se ainda precisar de ajuda.'
+  return ticket.responsavel?.nome
+    ? `${ticket.responsavel.nome} está a acompanhar o pedido.`
+    : 'A equipa está a procurar um responsável.'
+}
+
 export function filterAndSortTickets(tickets, filters, now, users = []) {
   const normalizedQuery = (filters.search || '').trim().toLocaleLowerCase()
   const visible = tickets.filter((ticket) => {
@@ -76,6 +89,10 @@ export function filterAndSortTickets(tickets, filters, now, users = []) {
 
   return visible.sort((a, b) => {
     if (filters.sort === 'recent') return new Date(b.atualizado_em) - new Date(a.atualizado_em)
+    // Chamados encerrados nunca disputam o topo da fila operacional com os ativos.
+    const finishedOrder = Number(isFinishedTicket(a)) - Number(isFinishedTicket(b))
+    if (finishedOrder) return finishedOrder
+    if (isFinishedTicket(a)) return new Date(b.atualizado_em) - new Date(a.atualizado_em)
     if (filters.sort === 'priority') {
       return PRIORITY_WEIGHT[a.prioridade] - PRIORITY_WEIGHT[b.prioridade]
         || getTicketUrgency(a, now) - getTicketUrgency(b, now)

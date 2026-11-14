@@ -64,7 +64,9 @@ src/
 
 TanStack Query é a única fonte de cache para dados remotos. Zustand guarda somente o identificador do perfil demonstrativo. Os componentes chamam a camada REST em `src/services/api.js`; somente a camada MSW lê e altera o dataset.
 
-`StyledEngineProvider` usa `enableCssLayer`, e `src/index.css` declara explicitamente a ordem de camadas `theme`, `base`, `mui`, `components` e `utilities`: regras utilitárias do Tailwind podem prevalecer sobre os estilos MUI sem remover o isolamento em cascata.
+`StyledEngineProvider` usa `enableCssLayer`. O MUI injeta os estilos globais antes do CSS do Tailwind, então a ordem de camadas `theme`, `base`, `mui`, `components` e `utilities` é declarada por um `GlobalStyles` em `src/main.jsx` (e repetida em `src/index.css`). Sem essa declaração antecipada, o reset do Tailwind (`base`) passa a sobrescrever padding, bordas e opacidade dos componentes MUI. Com ela, utilitários do Tailwind ainda podem prevalecer sobre os estilos MUI.
+
+No MUI v9, `Typography` ignora props de sistema (como `display`) e cores com notação de ponto (`text.secondary`). Use `color="textSecondary"` e classes utilitárias (`className="block"`).
 
 ## API simulada e persistência
 
@@ -92,7 +94,7 @@ Eventos com UUID já processado são ignorados nesta sessão. Mensagens também 
 
 O relógio da demonstração parte de `meta.agora` no JSON e avança pelo tempo transcorrido na sessão; não substitui essa referência pelo horário atual do computador como instante inicial. Os prazos de primeira resposta e resolução são calculados separadamente. A exibição converte UTC usando `locale` e `zoneinfo` do usuário (por exemplo, Lisboa e São Paulo).
 
-Chamados ativos pausados mostram “SLA pausado” e não têm contagem regressiva. Chamados resolvidos/fechados são avaliados pelo instante de resolução/fechamento registrado, não pelo relógio corrente. Um prazo com até duas horas restantes é sinalizado como próximo do vencimento; o corte é uma decisão operacional da demonstração.
+Chamados ativos pausados mostram “SLA pausado” e não têm contagem regressiva. Chamados resolvidos/fechados são avaliados pelo instante de resolução/fechamento registrado, não pelo relógio corrente, e ficam após os ativos nas ordenações por SLA e prioridade. Um prazo com até duas horas restantes é sinalizado como próximo do vencimento; o corte é uma decisão operacional da demonstração.
 
 ## Decisões de produto e limites
 

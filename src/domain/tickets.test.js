@@ -5,6 +5,7 @@ import {
   changeTicketStatus,
   filterAndSortTickets,
   formatDateTime,
+  getCustomerNextStep,
   getSlaState,
 } from './tickets'
 import { canAccessTicket, visibleMessagesFor } from '../mocks/permissions'
@@ -122,6 +123,26 @@ describe('operações e visibilidade', () => {
     const result = filterAndSortTickets([recent, urgent], { search: 'vpn', sort: 'sla' }, now)
     expect(result.map((ticket) => ticket.id)).toEqual(['urgent'])
     expect(filterAndSortTickets([urgent, recent], { sort: 'recent' }, now)[0].id).toBe('recent')
+  })
+
+  it('mantém chamados encerrados abaixo dos ativos, mesmo com SLA violado', () => {
+    const active = { ...baseTicket, id: 'active', prazo_resolucao: '2026-11-03T20:00:00Z' }
+    const closed = {
+      ...baseTicket,
+      id: 'closed',
+      status: 'fechado',
+      prazo_resolucao: '2026-10-01T10:00:00Z',
+      resolvido_em: '2026-10-02T10:00:00Z',
+    }
+    expect(filterAndSortTickets([closed, active], { sort: 'sla' }, now).map((ticket) => ticket.id)).toEqual(['active', 'closed'])
+    expect(filterAndSortTickets([closed, active], { sort: 'priority' }, now).map((ticket) => ticket.id)).toEqual(['active', 'closed'])
+  })
+
+  it('explica ao cliente o próximo passo conforme a situação do pedido', () => {
+    expect(getCustomerNextStep({ ...baseTicket, status: 'aguardando_cliente' })).toMatch(/precisa da sua resposta/)
+    expect(getCustomerNextStep({ ...baseTicket, status: 'fechado' })).toMatch(/encerrado/i)
+    expect(getCustomerNextStep({ ...baseTicket, responsavel: { nome: 'Marina' } })).toContain('Marina')
+    expect(getCustomerNextStep({ ...baseTicket, responsavel: null })).toMatch(/procurar um responsável/)
   })
 
   it('não duplica mensagens nem reaplica UUID de evento', () => {

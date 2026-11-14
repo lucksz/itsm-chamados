@@ -15,6 +15,7 @@ import {
   TextField,
 } from '@mui/material'
 import { api } from '../../services/api'
+import { STATUS_LABELS } from '../../domain/tickets'
 
 const EVENT_TYPES = [
   ['chamado.aberto', 'Chamado aberto'],
@@ -49,7 +50,7 @@ export function EventSimulator({ userId, tickets, consultants }) {
   function emit() {
     mutation.mutate({
       tipo: type,
-      chamado_id: ticketId,
+      chamado_id: selectedTicket?.id,
       consultor_id: availableConsultants.some((entry) => entry.id === consultantId)
         ? consultantId
         : availableConsultants[0]?.id,
@@ -77,7 +78,7 @@ export function EventSimulator({ userId, tickets, consultants }) {
           {type !== 'chamado.aberto' && (
             <FormControl fullWidth size="small">
               <InputLabel id="event-ticket-label">Chamado</InputLabel>
-              <Select labelId="event-ticket-label" label="Chamado" value={ticketId || tickets[0]?.id || ''} onChange={(event) => setTicketId(event.target.value)}>
+              <Select labelId="event-ticket-label" label="Chamado" value={selectedTicket?.id || ''} onChange={(event) => setTicketId(event.target.value)}>
                 {tickets.map((ticket) => <MenuItem value={ticket.id} key={ticket.id}>#{ticket.numero} · {ticket.titulo}</MenuItem>)}
               </Select>
             </FormControl>
@@ -101,7 +102,7 @@ export function EventSimulator({ userId, tickets, consultants }) {
             <FormControl fullWidth size="small">
               <InputLabel id="event-status-label">Novo status</InputLabel>
               <Select labelId="event-status-label" label="Novo status" value={status} onChange={(event) => setStatus(event.target.value)}>
-                {['aberto', 'em_atendimento', 'aguardando_cliente', 'resolvido', 'fechado'].map((value) => <MenuItem value={value} key={value}>{value.replaceAll('_', ' ')}</MenuItem>)}
+                {Object.entries(STATUS_LABELS).map(([value, label]) => <MenuItem value={value} key={value}>{label}</MenuItem>)}
               </Select>
             </FormControl>
           )}

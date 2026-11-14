@@ -28,12 +28,34 @@ export function TicketConversation({ user, ticket, messages }) {
   const setInternalNote = useDraftStore((state) => state.setInternalNote)
   const [visibleCount, setVisibleCount] = useState(80)
   const [newMessages, setNewMessages] = useState(0)
-  const endRef = useRef(null)
+  const listRef = useRef(null)
   const queryClient = useQueryClient()
+  const lastMessage = messages[messages.length - 1]
+  const lastMessageId = lastMessage?.id
+  const lastMessageIsOwn = lastMessage?.autor_id === user.id
+  const noun = user.perfil === 'cliente' ? 'pedido' : 'chamado'
   const mutation = useMutation({
     mutationFn: (input) => api.addMessage(user.id, ticket.id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ticket', user.id, ticket.id] }),
   })
+
+  function scrollToLatest(smooth = false) {
+    const list = listRef.current
+    if (!list) return
+    if (smooth && typeof list.scrollTo === 'function') list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' })
+    else list.scrollTop = list.scrollHeight
+  }
+
+  // A conversa abre na mensagem mais recente e acompanha as respostas enviadas pelo próprio usuário.
+  useEffect(() => {
+    const list = listRef.current
+    if (list) list.scrollTop = list.scrollHeight
+  }, [ticket.id])
+
+  useEffect(() => {
+    const list = listRef.current
+    if (lastMessageIsOwn && list) list.scrollTop = list.scrollHeight
+  }, [lastMessageId, lastMessageIsOwn])
 
   useEffect(() => eventBus.subscribe((event) => {
     if (event.tipo === 'mensagem.adicionada'
@@ -62,7 +84,7 @@ export function TicketConversation({ user, ticket, messages }) {
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <div>
           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Conversa</Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="textSecondary" className="block">
             {messages.length} {messages.length === 1 ? 'mensagem' : 'mensagens'}
           </Typography>
         </div>
@@ -71,7 +93,7 @@ export function TicketConversation({ user, ticket, messages }) {
             size="small"
             endIcon={<KeyboardDoubleArrowDownIcon />}
             onClick={() => {
-              endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+              scrollToLatest(true)
               setNewMessages(0)
             }}
           >
@@ -79,14 +101,14 @@ export function TicketConversation({ user, ticket, messages }) {
           </Button>
         )}
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/60 p-4 sm:p-5" aria-live="polite">
+      <div ref={listRef} className="max-h-[60vh] min-h-[240px] flex-1 space-y-4 overflow-y-auto bg-slate-50/60 p-4 sm:p-5" aria-live="polite">
         {messages.length > visibleCount && (
           <Button size="small" onClick={() => setVisibleCount((count) => count + 80)}>
             Carregar mensagens anteriores
           </Button>
         )}
         {ordered.length === 0 && (
-          <div className="py-12 text-center text-sm text-slate-500">Ainda não há mensagens neste chamado.</div>
+          <div className="py-12 text-center text-sm text-slate-500">Ainda não há mensagens neste {noun}.</div>
         )}
         {ordered.map((message) => {
           const own = message.autor_id === user.id
@@ -98,7 +120,7 @@ export function TicketConversation({ user, ticket, messages }) {
               <div className={`max-w-[86%] sm:max-w-[76%] ${own ? 'text-right' : ''}`}>
                 <div className={`mb-1 flex flex-wrap items-center gap-x-2 gap-y-1 ${own ? 'justify-end' : ''}`}>
                   <Typography variant="caption" sx={{ fontWeight: 700 }}>{message.autor?.nome || 'Usuário'}</Typography>
-                  <Typography variant="caption" color="text.secondary">{formatDateTime(message.criada_em, user)}</Typography>
+                  <Typography variant="caption" color="textSecondary">{formatDateTime(message.criada_em, user)}</Typography>
                   {message.interna && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">Nota interna</span>}
                 </div>
                 <div className={`rounded-2xl px-4 py-3 text-left text-sm leading-6 ${message.interna ? 'border border-amber-200 bg-amber-50' : own ? 'bg-indigo-600 text-white' : 'border border-slate-200 bg-white'}`}>
@@ -108,7 +130,6 @@ export function TicketConversation({ user, ticket, messages }) {
             </div>
           )
         })}
-        <div ref={endRef} />
       </div>
       <Divider />
       <form onSubmit={send} className="space-y-2 bg-white p-4">
@@ -133,7 +154,7 @@ export function TicketConversation({ user, ticket, messages }) {
           ) : (
             <span className="text-xs text-slate-400">
               {ticket.status === 'fechado'
-                ? 'Reabra o chamado com uma justificativa para continuar a conversa.'
+                ? `Reabra o ${noun} com uma justificativa para continuar a conversa.`
                 : user.perfil === 'cliente'
                   ? 'Apenas a equipa de suporte verá esta mensagem.'
                   : 'Mensagens internas são visíveis apenas à equipa.'}

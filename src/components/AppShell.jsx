@@ -49,17 +49,18 @@ export function AppShell({ user, children }) {
             </span>
             <span className="hidden sm:block">
               <Typography variant="subtitle1" sx={{ fontWeight: 750, lineHeight: 1.2 }}>Nexo</Typography>
-              <Typography variant="caption" color="text.secondary">Central de atendimento</Typography>
+              <Typography variant="caption" color="textSecondary">Central de atendimento</Typography>
             </span>
           </Link>
           <div className="flex-1" />
           {user?.perfil === 'gestor' && (
             <Button
               size="small"
+              variant="outlined"
               color="inherit"
               disabled={resetting}
               onClick={restoreDemo}
-              className="hidden sm:inline-flex"
+              className="hidden border-slate-300 text-slate-700 sm:inline-flex"
             >
               Restaurar dados
             </Button>
@@ -70,7 +71,7 @@ export function AppShell({ user, children }) {
             </Avatar>
             <div className="hidden lg:block">
               <Typography variant="body2" sx={{ fontWeight: 650 }}>{user?.nome}</Typography>
-              <Typography variant="caption" color="text.secondary">{profile.role}</Typography>
+              <Typography variant="caption" color="textSecondary">{profile.role}</Typography>
             </div>
           </div>
           <FormControl size="small" sx={{ minWidth: { xs: 152, sm: 220 } }}>

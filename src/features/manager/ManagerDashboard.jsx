@@ -18,6 +18,8 @@ import AssignmentLateOutlinedIcon from '@mui/icons-material/AssignmentLateOutlin
 import PersonOffOutlinedIcon from '@mui/icons-material/PersonOffOutlined'
 import { api } from '../../services/api'
 import { useTickets } from '../../hooks/useTickets'
+import { useDemoClock } from '../../hooks/useDemoClock'
+import { formatDateTime, getSlaState } from '../../domain/tickets'
 import { EventSimulator } from './EventSimulator'
 
 const StatusChart = lazy(() => import('./StatusChart'))
@@ -29,9 +31,9 @@ function MetricCard({ label, value, note, icon: Icon, tone }) {
     <Card variant="outlined" className="rounded-2xl">
       <CardContent className="flex items-start justify-between gap-2 p-5">
         <div>
-          <Typography variant="body2" color="text.secondary">{label}</Typography>
+          <Typography variant="body2" color="textSecondary">{label}</Typography>
           <Typography variant="h4" sx={{ fontWeight: 800 }} className="mt-1">{value ?? '—'}</Typography>
-          <Typography variant="caption" color="text.secondary">{note}</Typography>
+          <Typography variant="caption" color="textSecondary">{note}</Typography>
         </div>
         <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
           <Icon />
@@ -46,6 +48,7 @@ export function ManagerDashboard({ user }) {
   const [group, setGroup] = useState('')
   const [consultant, setConsultant] = useState('')
   const [page, setPage] = useState(0)
+  const demoNow = useDemoClock()
   const sessionQuery = useQuery({ queryKey: ['session', user.id], queryFn: () => api.session(user.id) })
   const analyticsQuery = useQuery({
     queryKey: ['analytics', user.id, group, consultant],
@@ -69,9 +72,12 @@ export function ManagerDashboard({ user }) {
     id: ticket.id,
     numero: ticket.numero,
     titulo: ticket.titulo,
+    grupoNome: ticket.grupo?.nome || '—',
     responsavelNome: ticket.responsavel?.nome || 'Sem responsável',
     status: ticket.status,
     prioridade: ticket.prioridade,
+    sla: getSlaState(ticket, demoNow).state,
+    prazo: formatDateTime(ticket.prazo_resolucao, user),
   }))
 
   return (
@@ -80,7 +86,7 @@ export function ManagerDashboard({ user }) {
         <div>
           <Typography variant="overline" color="primary">Visão de equipe</Typography>
           <Typography variant="h4" sx={{ fontWeight: 800 }} className="tracking-tight">Painel operacional</Typography>
-          <Typography color="text.secondary" className="mt-1">Uma visão da carga, dos prazos e dos pontos que precisam de redistribuição.</Typography>
+          <Typography color="textSecondary" className="mt-1">Uma visão da carga, dos prazos e dos pontos que precisam de redistribuição.</Typography>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <EventSimulator userId={user.id} tickets={tickets} consultants={consultants} />
@@ -114,14 +120,14 @@ export function ManagerDashboard({ user }) {
           <div className="grid gap-4 xl:grid-cols-2">
             <Paper variant="outlined" className="rounded-2xl p-4 sm:p-5">
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Chamados por status</Typography>
-              <Typography variant="caption" color="text.secondary">Volume no grupo ou consultor selecionado</Typography>
+              <Typography variant="caption" color="textSecondary" className="block">Volume no grupo ou consultor selecionado</Typography>
               <Suspense fallback={<div className="grid h-[250px] place-items-center"><CircularProgress size={24} /></div>}>
                 <StatusChart data={analytics.statusCounts} />
               </Suspense>
             </Paper>
             <Paper variant="outlined" className="rounded-2xl p-4 sm:p-5">
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Chamados por prioridade</Typography>
-              <Typography variant="caption" color="text.secondary">Use a prioridade técnica com o risco de SLA para orientar a fila.</Typography>
+              <Typography variant="caption" color="textSecondary" className="block">Use a prioridade técnica com o risco de SLA para orientar a fila.</Typography>
               <Suspense fallback={<div className="grid h-[250px] place-items-center"><CircularProgress size={24} /></div>}>
                 <PriorityChart data={analytics.priorityCounts} />
               </Suspense>
@@ -132,9 +138,9 @@ export function ManagerDashboard({ user }) {
             <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
               <div>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Carga atual por consultor</Typography>
-                <Typography variant="caption" color="text.secondary">Chamados ativos atribuídos agora; não representa tempo histórico sem atribuição.</Typography>
+                <Typography variant="caption" color="textSecondary" className="block">Chamados ativos atribuídos agora; não representa tempo histórico sem atribuição.</Typography>
               </div>
-              <Typography variant="caption" color="text.secondary">Referência de acompanhamento: 0–5 poucos · acima de 40 alta carga</Typography>
+              <Typography variant="caption" color="textSecondary">Referência de acompanhamento: 0–5 poucos · acima de 40 alta carga</Typography>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {activeLoads.map((entry) => {
@@ -149,7 +155,7 @@ export function ManagerDashboard({ user }) {
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                       <div className={`h-full rounded-full ${busy ? 'bg-rose-500' : low ? 'bg-amber-400' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, entry.assigned / 50 * 100)}%` }} />
                     </div>
-                    <Typography variant="caption" color={busy ? 'error.main' : low ? 'warning.main' : 'text.secondary'}>
+                    <Typography variant="caption" color={busy ? 'error' : low ? 'warning' : 'textSecondary'}>
                       {busy ? 'Carga alta' : low ? 'Poucos chamados atribuídos' : 'Carga equilibrada'}
                     </Typography>
                   </div>
@@ -162,7 +168,7 @@ export function ManagerDashboard({ user }) {
             <div className="flex flex-wrap items-center justify-between gap-2 p-5">
               <div>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Fila operacional</Typography>
-                <Typography variant="caption" color="text.secondary">Ordenada pelo prazo de resolução mais próximo</Typography>
+                <Typography variant="caption" color="textSecondary" className="block">Chamados ativos primeiro, do maior para o menor risco de SLA; encerrados ao final.</Typography>
               </div>
               {ticketQuery.isError && <Alert severity="error">{ticketQuery.error.message}</Alert>}
             </div>

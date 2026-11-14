@@ -17,7 +17,7 @@ import {
 import AssignmentIndOutlinedIcon from '@mui/icons-material/AssignmentIndOutlined'
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined'
 import { api } from '../../services/api'
-import { getSlaState, formatDateTime } from '../../domain/tickets'
+import { PRIORITY_LABELS, STATUS_LABELS, formatDateTime, getCustomerNextStep, getSlaState, isFinishedTicket } from '../../domain/tickets'
 import { useTicket } from '../../hooks/useTickets'
 import { StatusChip, SlaChip } from '../../components/TicketBadges'
 import { TicketConversation } from '../../components/TicketConversation'
@@ -26,14 +26,17 @@ import { useDemoClock } from '../../hooks/useDemoClock'
 
 function SlaLine({ label, state, deadline, user, customer }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <div className="flex items-center gap-2 text-sm text-slate-600"><AccessTimeOutlinedIcon fontSize="small" />{label}</div>
-      <div className="text-right">
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-sm text-slate-700">
+          <AccessTimeOutlinedIcon fontSize="small" className="text-slate-400" />
+          {label}
+        </span>
         <SlaChip state={state.state} audience={customer ? 'customer' : 'internal'} />
-        <Typography variant="caption" display="block" color="text.secondary" className="mt-1">
-          {state.state === 'paused' ? 'Contagem suspensa' : formatDateTime(deadline, user)}
-        </Typography>
       </div>
+      <Typography variant="caption" color="textSecondary" className="block pl-[26px]">
+        {state.state === 'paused' ? 'Contagem suspensa' : `Prazo: ${formatDateTime(deadline, user)}`}
+      </Typography>
     </div>
   )
 }
@@ -80,11 +83,11 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
       {(statusMutation.isError || assignMutation.isError) && (
         <Alert severity="error">{statusMutation.error?.message || assignMutation.error?.message}</Alert>
       )}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="space-y-4">
           <Paper variant="outlined" className="rounded-2xl p-5 sm:p-6">
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Typography variant="overline" color="text.secondary">Chamado #{ticket.numero}</Typography>
+              <Typography variant="overline" color="textSecondary">{customer ? 'Pedido' : 'Chamado'} #{ticket.numero}</Typography>
               <StatusChip status={ticket.status} audience={customer ? 'customer' : 'internal'} />
             </div>
             <Typography variant="h5" sx={{ fontWeight: 750 }} className="mb-3">{ticket.titulo}</Typography>
@@ -101,11 +104,11 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
                     <div className="min-w-0 flex-1">
                       <Typography variant="body2">
                         {entry.tipo === 'status'
-                          ? `${entry.usuario?.nome || 'Equipe'} alterou para ${entry.para?.replaceAll('_', ' ')}`
+                          ? `${entry.usuario?.nome || 'Equipe'} alterou para ${STATUS_LABELS[entry.para] || entry.para?.replaceAll('_', ' ')}`
                           : `Responsável: ${entry.responsavelAnterior?.nome || 'Sem responsável'} → ${entry.responsavelNovo?.nome || 'Sem responsável'}`}
                       </Typography>
-                      {entry.motivo && <Typography variant="body2" color="text.secondary">{entry.motivo}</Typography>}
-                      <Typography variant="caption" color="text.secondary">{formatDateTime(entry.ocorrido_em, user)}</Typography>
+                      {entry.motivo && <Typography variant="body2" color="textSecondary">{entry.motivo}</Typography>}
+                      <Typography variant="caption" color="textSecondary">{formatDateTime(entry.ocorrido_em, user)}</Typography>
                     </div>
                   </div>
                 ))}
@@ -124,7 +127,7 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
             {!customer && (
               <>
                 <div>
-                  <Typography variant="caption" color="text.secondary">Solicitante</Typography>
+                  <Typography variant="caption" color="textSecondary">Solicitante</Typography>
                   <div className="mt-1 flex items-center gap-2">
                     <Avatar sx={{ width: 30, height: 30, bgcolor: '#f1f5f9', color: '#334155', fontSize: 12 }}>
                       {ticket.solicitante?.nome?.split(' ').map((part) => part[0]).slice(0, 2).join('')}
@@ -138,43 +141,47 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
             {customer ? (
               <>
                 <div>
-                  <Typography variant="caption" color="text.secondary">Responsável</Typography>
+                  <Typography variant="caption" color="textSecondary">Responsável</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600 }} className="mt-1">
                     {ticket.responsavel?.nome || 'A equipa irá assumir o seu pedido'}
                   </Typography>
                 </div>
                 <div>
-                  <Typography variant="caption" color="text.secondary">Próximo passo</Typography>
-                  <Typography variant="body2" className="mt-1">
-                    {ticket.status === 'aguardando_cliente' ? 'Aguardamos a sua resposta nesta conversa.' : 'A equipa de suporte dará seguimento ao pedido.'}
-                  </Typography>
+                  <Typography variant="caption" color="textSecondary">Próximo passo</Typography>
+                  <Typography variant="body2" className="mt-1">{getCustomerNextStep(ticket)}</Typography>
                 </div>
-                <Divider />
               </>
             ) : (
               <>
                 <div>
-                  <Typography variant="caption" color="text.secondary">Grupo · categoria</Typography>
+                  <Typography variant="caption" color="textSecondary">Grupo · categoria</Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600 }} className="mt-1">{ticket.grupo?.nome} · {ticket.categoria?.nome}</Typography>
                 </div>
                 <div>
-                  <Typography variant="caption" color="text.secondary">Prioridade</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }} className="mt-1 capitalize">{ticket.prioridade}</Typography>
+                  <Typography variant="caption" color="textSecondary">Prioridade</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }} className="mt-1">{PRIORITY_LABELS[ticket.prioridade] || ticket.prioridade}</Typography>
                 </div>
                 <Divider />
-                <FormControl size="small" fullWidth>
-                  <InputLabel id="assignee-label">Responsável</InputLabel>
-                  <Select
-                    labelId="assignee-label"
-                    value={ticket.responsavel_id || ''}
-                    label="Responsável"
-                    onChange={(event) => assignMutation.mutate(event.target.value)}
-                    disabled={user.perfil !== 'gestor' || assignMutation.isPending || consultantsQuery.isLoading}
-                  >
-                    {user.perfil === 'gestor' && <MenuItem value=""><em>Sem responsável</em></MenuItem>}
-                    {consultants.map((consultant) => <MenuItem value={consultant.id} key={consultant.id}>{consultant.nome}</MenuItem>)}
-                  </Select>
-                </FormControl>
+                {user.perfil === 'gestor' ? (
+                  <FormControl size="small" fullWidth>
+                    <InputLabel id="assignee-label">Responsável</InputLabel>
+                    <Select
+                      labelId="assignee-label"
+                      value={ticket.responsavel_id || ''}
+                      label="Responsável"
+                      onChange={(event) => assignMutation.mutate(event.target.value)}
+                      disabled={assignMutation.isPending || consultantsQuery.isLoading}
+                    >
+                      <MenuItem value=""><em>Sem responsável</em></MenuItem>
+                      {consultants.map((consultant) => <MenuItem value={consultant.id} key={consultant.id}>{consultant.nome}</MenuItem>)}
+                    </Select>
+                  </FormControl>
+                ) : (
+                  <div>
+                    <Typography variant="caption" color="textSecondary">Responsável</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }} className="mt-1">{ticket.responsavel?.nome || 'Sem responsável'}</Typography>
+                  </div>
+                )}
                 {user.perfil === 'consultor' && !ticket.responsavel_id && (
                   <Button
                     fullWidth
@@ -188,10 +195,14 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
                 )}
               </>
             )}
-            <Divider />
-            <Typography variant="caption" color="text.secondary">Prazos de atendimento</Typography>
-            <SlaLine label="Primeira resposta" state={responseSla} deadline={ticket.prazo_primeira_resposta} user={user} customer={customer} />
-            <SlaLine label="Resolução" state={resolutionSla} deadline={ticket.prazo_resolucao} user={user} customer={customer} />
+            {(!customer || !isFinishedTicket(ticket)) && (
+              <>
+                <Divider />
+                <Typography variant="caption" color="textSecondary">Prazos de atendimento</Typography>
+                <SlaLine label="Primeira resposta" state={responseSla} deadline={ticket.prazo_primeira_resposta} user={user} customer={customer} />
+                <SlaLine label="Resolução" state={resolutionSla} deadline={ticket.prazo_resolucao} user={user} customer={customer} />
+              </>
+            )}
             {!customer && (
               <>
                 <Divider />
@@ -199,15 +210,15 @@ export function TicketDetailPanel({ user, ticketId, backAction }) {
               </>
             )}
             {customer && ticket.status === 'fechado' && (
-              <Button fullWidth variant="contained" onClick={() => setStatusDialog(true)}>O problema continua? Reabrir</Button>
+              <Button fullWidth variant="contained" onClick={() => setStatusDialog(true)}>Reabrir pedido</Button>
             )}
-            <Typography variant="caption" color="text.secondary" display="block">
+            <Typography variant="caption" color="textSecondary" className="block">
               Aberto em {formatDateTime(ticket.aberto_em, user)}
             </Typography>
           </Paper>
           {customer && (
             <Paper variant="outlined" className="rounded-2xl p-4">
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="textSecondary">
                 A conversa e as atualizações deste pedido são visíveis apenas para si e para a equipa de suporte.
               </Typography>
             </Paper>

@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { CssBaseline, StyledEngineProvider, ThemeProvider, createTheme } from '@mui/material'
+import { CssBaseline, GlobalStyles, StyledEngineProvider, ThemeProvider, createTheme } from '@mui/material'
 import './index.css'
 import App from './App.jsx'
 import { worker } from './mocks/browser'
@@ -22,13 +22,16 @@ const theme = createTheme({
 async function start() {
   try {
     await worker.start({
-      onUnhandledRequest: (request, print) => {
-        if (request.url.pathname.startsWith('/api/')) print.warning()
+      onUnhandledFrame: ({ frame, defaults }) => {
+        const request = frame.data?.request
+        if (request && new URL(request.url).pathname.startsWith('/api/')) defaults.warn()
       },
     })
     createRoot(document.getElementById('root')).render(
       <StrictMode>
         <StyledEngineProvider enableCssLayer>
+          {/* O MUI injeta seus estilos globais antes do CSS do Tailwind; sem declarar a ordem aqui, a camada "mui" fica abaixo do reset (base). */}
+          <GlobalStyles styles="@layer theme, base, mui, components, utilities;" />
           <ThemeProvider theme={theme}>
             <CssBaseline />
             <QueryClientProvider client={queryClient}>

@@ -30,7 +30,7 @@ export function StatusChangeDialog({ open, onClose, currentStatus, onSubmit, reo
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs">
       <form onSubmit={submit}>
-        <DialogTitle>{reopenOnly ? 'Reabrir chamado' : 'Alterar status'}</DialogTitle>
+        <DialogTitle>{reopenOnly ? 'Reabrir pedido' : 'Alterar status'}</DialogTitle>
         <DialogContent className="flex flex-col gap-4 pt-3">
           {!reopenOnly && (
             <FormControl fullWidth size="small">
